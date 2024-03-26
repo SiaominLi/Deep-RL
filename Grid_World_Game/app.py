@@ -30,20 +30,6 @@ class GridWorld:
                 if (i, j) not in self.obstacles and (i, j) != self.end:
                     self.policy[(i, j)] = random.choice(['up', 'down', 'left', 'right'])
 
-    def value_iteration(self, gamma=0.9, epsilon=1e-6):
-        """Perform value iteration to converge the value function."""
-        self.initialize_random_policy()
-        delta = float('inf')
-        while delta > epsilon:
-            delta = 0
-            for state in self.policy:
-                if state != self.end:
-                    action = self.policy[state]
-                    old_value = self.value_function.get(state, 0)
-                    self.bellman_update(state, action, gamma)
-                    new_value = self.value_function[state]
-                    delta = max(delta, abs(old_value - new_value))
-
     def bellman_update(self, state, action, gamma=0.9):
         row, col = state
         next_states = []
@@ -71,6 +57,20 @@ class GridWorld:
                 value += transition_probs[i] * (gamma * self.value_function.get(next_state, 0) - 0.1)  # step penalty
 
         self.value_function[state] = value
+    def value_iteration(self, gamma=0.9, epsilon=1e-6):
+        """Perform value iteration to converge the value function."""
+        self.initialize_random_policy()
+        delta = float('inf')
+        while delta > epsilon:
+            delta = 0
+            for state in self.policy:
+                if state != self.end:
+                    action = self.policy[state]
+                    old_value = self.value_function.get(state, 0)
+                    self.bellman_update(state, action, gamma)
+                    new_value = self.value_function[state]
+                    delta = max(delta, abs(old_value - new_value))
+                    print(f"State {state}: Value = {new_value}")  # 打印当前状态值
 
     def get_optimal_policy(self):
         """Derive the optimal policy from the converged value function."""
@@ -138,7 +138,6 @@ def evaluate_policy():
             grid_world.set_obstacle(row, col)
 
     grid_world.value_iteration()
-
     optimal_policy = grid_world.get_optimal_policy()
 
     policy_arrows = []
