@@ -19,7 +19,6 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            position: relative;
         }
         .start {
             background-color: green;
@@ -33,9 +32,6 @@
         .value {
             font-size: 12px;
             color: blue;
-            position: absolute;
-            bottom: 2px;
-            left: 2px;
         }
         .action {
             font-size: 24px;
@@ -55,6 +51,11 @@
 
     <div class="grid-container" id="grid-container"></div>
 
+    <div id="policy-container" style="display:none;">
+        <h2>Policy Arrows</h2>
+        <table id="policy-table"></table>
+    </div>
+
     <script>
         var startSet = false;
         var endSet = false;
@@ -70,7 +71,44 @@
                 $('#dimension').text(n);
 
                 $('#set-points-btn').prop('disabled', true);
+                $('#evaluate-btn').prop('disabled', false);
+
+                // Generate grid cells
+                var gridContainer = $('#grid-container');
+                gridContainer.empty();
+                gridContainer.css('grid-template-columns', 'repeat(' + n + ', 50px)'); // 修改这一行
+                for (var i = 0; i < n; i++) {
+                    for (var j = 0; j < n; j++) {
+                        var cell = $('<div class="cell"></div>').attr('id', 'cell-' + i + '-' + j);
+                        gridContainer.append(cell);
+                    }
+                }
+                // Set cell click event to toggle cell types
+                $('.cell').click(function() {
+                    if (!startSet) {
+                        $(this).addClass('start');
+                        startSet = true;
+                        startCell = $(this);
+                    } else if (!endSet) {
+                        $(this).addClass('end');
+                        endSet = true;
+                        endCell = $(this);
+                    } else if (obstacleCount < n - 2) {
+                        if (!$(this).hasClass('start') && !$(this).hasClass('end') && !$(this).hasClass('obstacle')) {
+                            $(this).addClass('obstacle');
+                            obstacleCells.push($(this));
+                            obstacleCount++;
+                        }
+                    }
+
+                    if (startSet && endSet && obstacleCount >= n - 2) {
+                        $('#evaluate-btn').prop('disabled', false);
+                    }
+                });
+            });
+
             $('#evaluate-btn').click(function() {
+                // Send grid data to evaluate policy
                 var gridData = [];
                 $('.cell').each(function() {
                     var cell = $(this);
@@ -94,35 +132,29 @@
                     contentType: 'application/json',
                     data: JSON.stringify({'points': gridData, 'n': n}),
                     success: function(response) {
-                        var valueIterationGenerator = response;
-                        updateGridDisplay(valueIterationGenerator);
+                        // Update policy arrows table
+                        var policyTable = $('#policy-table');
+                        policyTable.empty();
+                        var counter = 0;
+                        for (var i = 0; i < n; i++) {
+                            var row = $('<tr></tr>');
+                            for (var j = 0; j < n; j++) {
+                                var cell = $('<td class="action"></td>');
+                                if (response.policy_arrows[counter] === '↑' || response.policy_arrows[counter] === '↓' || response.policy_arrows[counter] === '←' || response.policy_arrows[counter] === '→') {
+                                    cell.text(response.policy_arrows[counter]);
+                                }
+                                row.append(cell);
+                                counter++;
+                            }
+                            policyTable.append(row);
+                        }
+                        $('#policy-container').show();
                     },
                     error: function(xhr, status, error) {
                         console.error('Error:', error);
                     }
                 });
             });
-
-            function updateGridDisplay(valueIterationGenerator) {
-                var next = valueIterationGenerator.next();
-                if (!next.done) {
-                    var data = next.value;
-                    var counter = 0;
-                    $('.cell').each(function() {
-                        var cell = $(this);
-                        var valueSpan = $('<span class="value"></span>').text(data.value_function_values[counter]);
-                        cell.html(valueSpan);
-                        if (data.policy_arrows[counter] === '↑' || data.policy_arrows[counter] === '↓' || data.policy_arrows[counter] === '←' || data.policy_arrows[counter] === '→') {
-                            cell.append('<span class="action">' + data.policy_arrows[counter] + '</span>');
-                        }
-                        counter++;
-                    });
-
-                    setTimeout(function() {
-                        updateGridDisplay(valueIterationGenerator);
-                    }, 500); // 设置迭代间隔时间
-                }
-            }
         });
     </script>
 </body>

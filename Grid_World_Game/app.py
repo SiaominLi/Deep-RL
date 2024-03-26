@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request ,jsonify
+from flask import Flask, render_template, request, jsonify
 import numpy as np
 import random
 
@@ -43,7 +43,7 @@ class GridWorld:
                     self.bellman_update(state, action, gamma)
                     new_value = self.value_function[state]
                     delta = max(delta, abs(old_value - new_value))
-                    
+
     def bellman_update(self, state, action, gamma=0.9):
         row, col = state
         next_states = []
@@ -117,44 +117,9 @@ class GridWorld:
         return actions
 
 
-    def value_iteration_generator(self, gamma=0.9, epsilon=1e-6):
-        """Perform value iteration and yield the value function and policy at each iteration."""
-        self.initialize_random_policy()
-        delta = float('inf')
-        converged = False
-        while not converged:
-            delta = 0
-            for state in self.policy:
-                if state != self.end:
-                    action = self.policy[state]
-                    old_value = self.value_function.get(state, 0)
-                    self.bellman_update(state, action, gamma)
-                    new_value = self.value_function[state]
-                    delta = max(delta, abs(old_value - new_value))
-
-            policy_arrows = []
-            value_function_values = []
-            for row in range(self.n):
-                for col in range(self.n):
-                    if (row, col) in self.policy:
-                        action = self.policy[(row, col)]
-                        if action == 'up':
-                            policy_arrows.append('↑')
-                        elif action == 'down':
-                            policy_arrows.append('↓')
-                        elif action == 'left':
-                            policy_arrows.append('←')
-                        elif action == 'right':
-                            policy_arrows.append('→')
-                    else:
-                        policy_arrows.append('')
-
-                    value_function_values.append(self.value_function.get((row, col), 0))
-
-            yield {'policy_arrows': policy_arrows, 'value_function_values': value_function_values}
-
-            if delta <= epsilon:
-                converged = True
+@app.route('/')
+def index():
+    return render_template('index.html', n=7)  # 修改这一行，传递合适的网格尺寸值给模板
 
 @app.route('/evaluate_policy', methods=['POST'])
 def evaluate_policy():
@@ -172,8 +137,28 @@ def evaluate_policy():
         elif cell_type == 'obstacle':
             grid_world.set_obstacle(row, col)
 
-    value_iteration_generator = grid_world.value_iteration_generator()
-    return jsonify(value_iteration_generator)
+    grid_world.value_iteration()
+
+    optimal_policy = grid_world.get_optimal_policy()
+
+    policy_arrows = []
+    for row in range(n):
+        for col in range(n):
+            if (row, col) in optimal_policy:
+                action = optimal_policy[(row, col)]
+                if action == 'up':
+                    policy_arrows.append('↑')
+                elif action == 'down':
+                    policy_arrows.append('↓')
+                elif action == 'left':
+                    policy_arrows.append('←')
+                elif action == 'right':
+                    policy_arrows.append('→')
+            else:
+                policy_arrows.append('')
+
+    return jsonify({'policy_arrows': policy_arrows})
+
 
 if __name__ == '__main__':
     app.run(debug=True)
