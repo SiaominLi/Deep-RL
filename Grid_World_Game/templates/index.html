@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Grid World!</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <style>
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat({{ n }}, 50px);
+        }
+        .cell {
+            width: 50px;
+            height: 50px;
+            border: 1px solid black;
+            box-sizing: border-box;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        .start {
+            background-color: green;
+        }
+        .end {
+            background-color: red;
+        }
+        .obstacle {
+            background-color: gray;
+        }
+        .value {
+            font-size: 12px;
+            color: blue;
+            position: absolute;
+            bottom: 2px;
+            left: 2px;
+        }
+        .action {
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Grid World!</h1>
+    <p>Please input the dimension (between 3 and 7) for the grid:</p>
+
+    <form>
+        <input type="number" id="n" name="n" min="3" max="7" required>
+        <button type="button" id="set-points-btn">Set Points</button>
+        <button type="button" id="evaluate-btn" disabled>Evaluate</button>
+    </form>
+    <p>Your input dimension is <span id="dimension"></span></p>
+
+    <div class="grid-container" id="grid-container"></div>
+
+    <script>
+        var startSet = false;
+        var endSet = false;
+        var obstacleCount = 0;
+        var n = null;
+        var startCell = null;
+        var endCell = null;
+        var obstacleCells = [];
+
+        $(document).ready(function() {
+            $('#set-points-btn').click(function() {
+                n = parseInt($('#n').val());
+                $('#dimension').text(n);
+
+                $('#set-points-btn').prop('disabled', true);
+            $('#evaluate-btn').click(function() {
+                var gridData = [];
+                $('.cell').each(function() {
+                    var cell = $(this);
+                    var classes = cell.attr('class').split(' ');
+                    var row = parseInt(cell.attr('id').split('-')[1]);
+                    var col = parseInt(cell.attr('id').split('-')[2]);
+                    var cellType = '';
+                    if (classes.includes('start')) {
+                        cellType = 'start';
+                    } else if (classes.includes('end')) {
+                        cellType = 'end';
+                    } else if (classes.includes('obstacle')) {
+                        cellType = 'obstacle';
+                    }
+                    gridData.push({'row': row, 'col': col, 'type': cellType});
+                });
+
+                $.ajax({
+                    type: 'POST',
+                    url: '/evaluate_policy',
+                    contentType: 'application/json',
+                    data: JSON.stringify({'points': gridData, 'n': n}),
+                    success: function(response) {
+                        var valueIterationGenerator = response;
+                        updateGridDisplay(valueIterationGenerator);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error:', error);
+                    }
+                });
+            });
+
+            function updateGridDisplay(valueIterationGenerator) {
+                var next = valueIterationGenerator.next();
+                if (!next.done) {
+                    var data = next.value;
+                    var counter = 0;
+                    $('.cell').each(function() {
+                        var cell = $(this);
+                        var valueSpan = $('<span class="value"></span>').text(data.value_function_values[counter]);
+                        cell.html(valueSpan);
+                        if (data.policy_arrows[counter] === '↑' || data.policy_arrows[counter] === '↓' || data.policy_arrows[counter] === '←' || data.policy_arrows[counter] === '→') {
+                            cell.append('<span class="action">' + data.policy_arrows[counter] + '</span>');
+                        }
+                        counter++;
+                    });
+
+                    setTimeout(function() {
+                        updateGridDisplay(valueIterationGenerator);
+                    }, 500); // 设置迭代间隔时间
+                }
+            }
+        });
+    </script>
+</body>
+</html>
