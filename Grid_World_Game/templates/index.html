@@ -132,7 +132,12 @@
                     contentType: 'application/json',
                     data: JSON.stringify({'points': gridData, 'n': n}),
                     success: function(response) {
-                        // Update policy arrows table
+                        if (response.error) {
+                            alert(response.error);
+                            return;
+                        }
+
+                        // 更新策略箭头表格
                         var policyTable = $('#policy-table');
                         policyTable.empty();
                         var counter = 0;
@@ -148,6 +153,17 @@
                             }
                             policyTable.append(row);
                         }
+
+                        // 显示最优路径
+                        var optimalPathContainer = $('<div id="optimal-path-container"></div>');
+                        var optimalPathText = '<h2>Optimal Path:</h2>';
+                        for (var i = 0; i < response.optimal_path.length; i++) {
+                            var state = response.optimal_path[i];
+                            optimalPathText += 'Step ' + i + ': (' + state[0] + ', ' + state[1] + ')<br>';
+                        }
+                        optimalPathContainer.html(optimalPathText);
+                        $('body').append(optimalPathContainer);
+
                         $('#policy-container').show();
                     },
                     error: function(xhr, status, error) {

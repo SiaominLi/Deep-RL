@@ -35,28 +35,58 @@ class GridWorld:
         next_states = []
         transition_probs = []
         if action == 'up':
-            next_states.append((row - 1, col))
-            transition_probs.append(1.0)
+            next_state = (row - 1, col)
+            if self.is_reachable(next_state):
+                next_states.append(next_state)
+                transition_probs.append(1.0)
         elif action == 'down':
-            next_states.append((row + 1, col))
-            transition_probs.append(1.0)
+            next_state = (row + 1, col)
+            if self.is_reachable(next_state):
+                next_states.append(next_state)
+                transition_probs.append(1.0)
         elif action == 'left':
-            next_states.append((row, col - 1))
-            transition_probs.append(1.0)
+            next_state = (row, col - 1)
+            if self.is_reachable(next_state):
+                next_states.append(next_state)
+                transition_probs.append(1.0)
         elif action == 'right':
-            next_states.append((row, col + 1))
-            transition_probs.append(1.0)
+            next_state = (row, col + 1)
+            if self.is_reachable(next_state):
+                next_states.append(next_state)
+                transition_probs.append(1.0)
 
-        value = 0
+        max_value = -float('inf')
         for i, next_state in enumerate(next_states):
             if next_state == self.end:
-                value += transition_probs[i] * 1  # terminal reward
+                value = transition_probs[i] * 10  # terminal reward
             elif next_state in self.obstacles:
-                value += transition_probs[i] * -0.1  # obstacle penalty
+                value = transition_probs[i] * -1  # obstacle penalty
             else:
-                value += transition_probs[i] * (gamma * self.value_function.get(next_state, 0) - 0.1)  # step penalty
+                value = transition_probs[i] * (gamma * self.value_function.get(next_state, 0) - 0.01)  # step penalty
 
-        self.value_function[state] = value
+            if value > max_value:
+                max_value = value
+
+        self.value_function[state] = max_value
+
+    def is_reachable(self, state):
+        # 使用广度优先搜索判断状态是否可达终止状态
+        queue = [self.end]
+        visited = set()
+        while queue:
+            curr_state = queue.pop(0)
+            if curr_state in visited:
+                continue
+            visited.add(curr_state)
+            row, col = curr_state
+            neighbors = [(row - 1, col), (row + 1, col), (row, col - 1), (row, col + 1)]
+            for neighbor in neighbors:
+                if neighbor == state:
+                    return True
+                if neighbor not in self.obstacles and 0 <= neighbor[0] < self.n and 0 <= neighbor[1] < self.n:
+                    queue.append(neighbor)
+        return False
+
     def value_iteration(self, gamma=0.9, epsilon=1e-6):
         """Perform value iteration to converge the value function."""
         self.initialize_random_policy()
@@ -70,8 +100,18 @@ class GridWorld:
                     self.bellman_update(state, action, gamma)
                     new_value = self.value_function[state]
                     delta = max(delta, abs(old_value - new_value))
-                    print(f"State {state}: Value = {new_value}")  # 打印当前状态值
+                    print(f"Iteration: State {state}, Value = {new_value}")  # 打印当前状态值
 
+        print("\nValue Iteration Converged!")
+        print("Optimal Value Function:")
+        for state, value in self.value_function.items():
+            print(f"State {state}: Value = {value}")
+
+        optimal_policy = self.get_optimal_policy()
+        print("\nOptimal Policy:")
+        for state, action in optimal_policy.items():
+            print(f"State {state}: Action = {action}")
+            
     def get_optimal_policy(self):
         """Derive the optimal policy from the converged value function."""
         optimal_policy = {}
@@ -101,7 +141,37 @@ class GridWorld:
                         best_action = action
                 optimal_policy[state] = best_action
         return optimal_policy
-
+    def get_optimal_path(self):
+        """根据最优策略从起点出发找到到达终点的路径"""
+        path = []
+        curr_state = self.start
+        while curr_state != self.end:
+            path.append(curr_state)
+            if curr_state not in self.policy:
+                # 无法到达终点
+                return []
+            action = self.policy[curr_state]
+            if action == 'up':
+                curr_state = (curr_state[0] - 1, curr_state[1])
+            elif action == 'down':
+                curr_state = (curr_state[0] + 1, curr_state[1])
+            elif action == 'left':
+                curr_state = (curr_state[0], curr_state[1] - 1)
+            elif action == 'right':
+                curr_state = (curr_state[0], curr_state[1] + 1)
+        path.append(self.end)
+        return path
+    def find_optimal_path(self, max_iterations=1000, gamma=0.9, epsilon=1e-6):
+        """自动重新初始化策略并继续寻找,直到找到从起点到终点的路径"""
+        iteration = 0
+        while iteration < max_iterations:
+            self.initialize_random_policy()
+            self.value_iteration(gamma, epsilon)
+            optimal_path = self.get_optimal_path()
+            if optimal_path:
+                return optimal_path
+            iteration += 1
+        return []  # 如果达到最大迭代次数仍未找到路径,返回空列表
     def get_possible_actions(self, state):
         """Get the possible actions from a given state."""
         actions = []
@@ -138,7 +208,10 @@ def evaluate_policy():
             grid_world.set_obstacle(row, col)
 
     grid_world.value_iteration()
-    optimal_policy = grid_world.get_optimal_policy()
+    optimal_path = grid_world.find_optimal_path()
+
+    if not optimal_path:
+        return jsonify({'error': 'Cannot find a path from the start state to the end state after maximum iterations.'})
 
     policy_arrows = []
     for row in range(n):
@@ -156,8 +229,7 @@ def evaluate_policy():
             else:
                 policy_arrows.append('')
 
-    return jsonify({'policy_arrows': policy_arrows})
-
+    return jsonify({'policy_arrows': policy_arrows, 'optimal_path': optimal_path})
 
 if __name__ == '__main__':
     app.run(debug=True)
