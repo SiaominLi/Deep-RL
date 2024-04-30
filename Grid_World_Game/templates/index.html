@@ -1,3 +1,5 @@
+<!-- templates/index.html -->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,6 +10,7 @@
     <style>
         .grid-container {
             display: grid;
+            /* You can adjust the size of the grid cells here */
             grid-template-columns: repeat({{ n }}, 50px);
         }
         .cell {
@@ -15,10 +18,7 @@
             height: 50px;
             border: 1px solid black;
             box-sizing: border-box;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            cursor: pointer; /* Make the cursor change to a pointer on hover */
         }
         .start {
             background-color: green;
@@ -29,12 +29,70 @@
         .obstacle {
             background-color: gray;
         }
-        .value {
-            font-size: 12px;
-            color: blue;
+
+        #grid-with-arrows {
+            display: grid;
+            grid-template-columns: repeat({{ n }}, 50px); /* 根据网格大小调整 */
+            gap: 1px; /* 网格之间的间隙 */
         }
-        .action {
-            font-size: 24px;
+
+        .cell-with-arrow {
+            width: 50px; /* 根据需要调整单元格大小 */
+            height: 50px;
+            border: 1px solid black;
+            box-sizing: border-box;
+            position: relative; /* 为箭头设置绝对定位 */
+        }
+
+        .arrow {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-style: solid;
+        }
+
+        .arrow.up {
+            left: 50%;
+            top: 5px;
+            margin-left: -5px;
+            border-width: 0 5px 10px 5px;
+            border-color: transparent transparent black transparent;
+        }
+
+        .arrow.down {
+            left: 50%;
+            bottom: 5px;
+            margin-left: -5px;
+            border-width: 10px 5px 0 5px;
+            border-color: black transparent transparent transparent;
+        }
+
+        .arrow.left {
+            left: 5px;
+            top: 50%;
+            margin-top: -5px;
+            border-width: 5px 0 5px 10px;
+            border-color: transparent transparent transparent black;
+        }
+
+        .arrow.right {
+            right: 5px;
+            top: 50%;
+            margin-top: -5px;
+            border-width: 5px 10px 5px 0;
+            border-color: transparent black transparent transparent;
+        }
+
+        .grid-table {
+            border-collapse: collapse;
+        }
+
+        .grid-table td {
+            width: 50px; /* 根据需要调整单元格大小 */
+            height: 50px;
+            border: 1px solid black;
+            text-align: center;
+            vertical-align: middle;
         }
     </style>
 </head>
@@ -42,136 +100,103 @@
     <h1>Grid World!</h1>
     <p>Please input the dimension (between 3 and 7) for the grid:</p>
 
-    <form>
+    <form action="/generate_grid" method="post">
         <input type="number" id="n" name="n" min="3" max="7" required>
-        <button type="button" id="set-points-btn">Set Points</button>
-        <button type="button" id="evaluate-btn" disabled>Evaluate</button>
+        <button type="submit">Enter</button>
     </form>
-    <p>Your input dimension is <span id="dimension"></span></p>
-
-    <div class="grid-container" id="grid-container"></div>
-
-    <div id="policy-container" style="display:none;">
-        <h2>Policy Arrows</h2>
-        <table id="policy-table"></table>
-    </div>
-
+    <p>Your input dimension is {{ n }}</p>
+    {% if n %}
     <script>
         var startSet = false;
         var endSet = false;
         var obstacleCount = 0;
-        var n = null;
+        var n = {{ n }};
         var startCell = null;
         var endCell = null;
         var obstacleCells = [];
 
-        $(document).ready(function() {
-            $('#set-points-btn').click(function() {
-                n = parseInt($('#n').val());
-                $('#dimension').text(n);
+        function setPoint(event, row, col) {
+            var cell = event.target;
+            if (!startSet) {
+                cell.classList.add('start');
+                startSet = true;
+                startCell = [row, col];
+                document.getElementById('text').innerHTML = 'Please click on the grid cells to set the ending point (red)';
+            } else if (!endSet) {
+                cell.classList.add('end');
+                endSet = true;
+                endCell = [row, col];
+                document.getElementById('text').innerHTML = 'Please click on the grid cells to set the obstacles (gray)';
+            } else if (obstacleCount < n - 2) {
+                if (!cell.classList.contains('start') && !cell.classList.contains('end') && !cell.classList.contains('obstacle')) {
+                    cell.classList.add('obstacle');
+                    obstacleCells.push([row, col]);
+                    obstacleCount++;
 
-                $('#set-points-btn').prop('disabled', true);
-                $('#evaluate-btn').prop('disabled', false);
-
-                // Generate grid cells
-                var gridContainer = $('#grid-container');
-                gridContainer.empty();
-                gridContainer.css('grid-template-columns', 'repeat(' + n + ', 50px)'); // 修改这一行
-                for (var i = 0; i < n; i++) {
-                    for (var j = 0; j < n; j++) {
-                        var cell = $('<div class="cell"></div>').attr('id', 'cell-' + i + '-' + j);
-                        gridContainer.append(cell);
-                    }
+                    if (obstacleCount < n - 2)
+                        document.getElementById('text').innerHTML = 'Please click on the grid cells to set the obstacles (gray)';
+                    else
+                        document.getElementById('text').innerHTML = '';
                 }
-                // Set cell click event to toggle cell types
-                $('.cell').click(function() {
-                    if (!startSet) {
-                        $(this).addClass('start');
-                        startSet = true;
-                        startCell = $(this);
-                    } else if (!endSet) {
-                        $(this).addClass('end');
-                        endSet = true;
-                        endCell = $(this);
-                    } else if (obstacleCount < n - 2) {
-                        if (!$(this).hasClass('start') && !$(this).hasClass('end') && !$(this).hasClass('obstacle')) {
-                            $(this).addClass('obstacle');
-                            obstacleCells.push($(this));
-                            obstacleCount++;
-                        }
-                    }
+            }
+        }
 
-                    if (startSet && endSet && obstacleCount >= n - 2) {
-                        $('#evaluate-btn').prop('disabled', false);
-                    }
-                });
-            });
-
-            $('#evaluate-btn').click(function() {
-                // Send grid data to evaluate policy
-                var gridData = [];
-                $('.cell').each(function() {
-                    var cell = $(this);
-                    var classes = cell.attr('class').split(' ');
-                    var row = parseInt(cell.attr('id').split('-')[1]);
-                    var col = parseInt(cell.attr('id').split('-')[2]);
+        function evaluate() {
+            var gridData = [];
+            for (var i = 0; i < {{ n }}; i++) {
+                for (var j = 0; j < {{ n }}; j++) {
+                    var cell = document.getElementById('cell-' + i + '-' + j);
                     var cellType = '';
-                    if (classes.includes('start')) {
+                    if (cell.classList.contains('start')) {
                         cellType = 'start';
-                    } else if (classes.includes('end')) {
+                    } else if (cell.classList.contains('end')) {
                         cellType = 'end';
-                    } else if (classes.includes('obstacle')) {
+                    } else if (cell.classList.contains('obstacle')) {
                         cellType = 'obstacle';
                     }
-                    gridData.push({'row': row, 'col': col, 'type': cellType});
-                });
+                    gridData.push({'row': i, 'col': j, 'type': cellType});
+                }
+            }
 
-                $.ajax({
-                    type: 'POST',
-                    url: '/evaluate_policy',
-                    contentType: 'application/json',
-                    data: JSON.stringify({'points': gridData, 'n': n}),
-                    success: function(response) {
-                        if (response.error) {
-                            alert(response.error);
-                            return;
-                        }
+            // 发送网格数据到后端进行评估
+            fetch('/evaluate_policy', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({'points': gridData, 'n': {{ n }} })
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data['optimal_path']);
+                // renderResults(data.value_function, data.optimal_policy);
+            })
+            .catch(error => console.error('Error:', error));
+        }
 
-                        // 更新策略箭头表格
-                        var policyTable = $('#policy-table');
-                        policyTable.empty();
-                        var counter = 0;
-                        for (var i = 0; i < n; i++) {
-                            var row = $('<tr></tr>');
-                            for (var j = 0; j < n; j++) {
-                                var cell = $('<td class="action"></td>');
-                                if (response.policy_arrows[counter] === '↑' || response.policy_arrows[counter] === '↓' || response.policy_arrows[counter] === '←' || response.policy_arrows[counter] === '→') {
-                                    cell.text(response.policy_arrows[counter]);
-                                }
-                                row.append(cell);
-                                counter++;
-                            }
-                            policyTable.append(row);
-                        }
 
-                        // 显示最优路径
-                        var optimalPathContainer = $('<div id="optimal-path-container"></div>');
-                        var optimalPathText = '<h2>Optimal Path:</h2>';
-                        for (var i = 0; i < response.optimal_path.length; i++) {
-                            var state = response.optimal_path[i];
-                            optimalPathText += 'Step ' + i + ': (' + state[0] + ', ' + state[1] + ')<br>';
-                        }
-                        optimalPathContainer.html(optimalPathText);
-                        $('body').append(optimalPathContainer);
+        window.onload = function(){
+            document.getElementById('text').innerHTML = 'Please click on the grid cells to set the starting point (green)';
+            $('#evaluate-btn').on('click', function (){
+                evaluate();
+            })
+        }
 
-                        $('#policy-container').show();
-                    },
-                    error: function(xhr, status, error) {
-                        console.error('Error:', error);
-                    }
-                });
-            });
-        });
     </script>
+    <p id="text"></p>
+    <div class="grid-container" id="grid-container">
+        {% for row in range(n) %}
+            {% for col in range(n) %}
+                <div class="cell" id="cell-{{ row }}-{{ col }}" onclick="setPoint(event, '{{ row }}', '{{ col }}')"></div>
+            {% endfor %}
+        {% endfor %}
+    </div>
+    <button id="evaluate-btn">Evaluate</button>
+    <div id="grid-with-arrows"></div>
+    <div id="results"></div>
+    <div id="value-function-grid"></div>
+    <div id="optimal-policy-grid"></div>
+
+    {% endif %}
 </body>
 </html>
