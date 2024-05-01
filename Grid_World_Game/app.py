@@ -148,30 +148,26 @@ class GridWorld:
             # print("Failed to reach end within step limit.")
             return []  # 如果在步数限制内未到达终点，返回空列表
 
-    def find_optimal_path(self, max_iterations=10000, gamma=0.9, epsilon=1e-6):
-        """自动重新初始化策略并继续寻找,直到找到从起点到终点的路径或达到尝试上限"""
-        iteration = 0
-        answer = []
-        for iteration in tqdm(range(max_iterations)):
+    def find_optimal_path(self, max_iterations=100000, gamma=0.9, epsilon=1e-6):
+        """自動重新初始化策略並繼續尋找,直到找到從起點到終點的最短路徑或達到嘗試上限"""
+        best_path = []
+        best_length = float('inf')
+        for _ in tqdm(range(max_iterations)):
             self.initialize_random_policy()
             self.value_iteration(gamma, epsilon)
-            optimal_path = self.get_optimal_path()
-            if optimal_path:
-
-                if not answer or len(answer) > len(optimal_path):
-                    # print("Optimal Path Found:", optimal_path)
-                    self.action_log = []
-                    answer = optimal_path
-            else:
-                # print(f"No valid path found in iteration {iteration + 1}")
-                pass
-            iteration += 1
-        #Print the value function in the specified format after each iteration
-        self.print_value_function()
-
-        if not answer:
+            self.action_log = []  # Reset the action log for each iteration
+            path = self.get_optimal_path()
+            if path and (len(path) < best_length):
+                best_path = path
+                best_length = len(path)
+                best_actions = self.action_log.copy()  # Copy current log as it's the best one yet
+        if best_path:
+            self.action_log = best_actions  # Store only the log of the best path found
+            print("Optimal Path Found:", best_path)
+            self.print_value_function()
+        else:
             print("Failed to find a path after maximum iterations")
-        return answer  # 如果达到最大迭代次数仍未找到路径,返回空列表
+        return best_path
 
     def get_action_log(self):
         """Retrieve the action log."""
@@ -221,15 +217,14 @@ def evaluate_policy():
     if not new_optimal_path:
         new_optimal_path = 'Optimal Path Not Found'
 
-    print('ANS:')
-    print(new_optimal_path)
+    print(f'ANS: {new_optimal_path}')
 
-    print('LEN:')
-    print(len(action_log))
+    # print('LEN:')
+    # print(len(action_log))
 
     return jsonify({
-        'optimal_path': new_optimal_path,
-        'action_log': action_log[-100:]
+        'optimal_path': optimal_path,  # Send the list of coordinates directly
+        'action_log': action_log[-1:]
     })
 
 
